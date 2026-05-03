@@ -758,35 +758,34 @@ async function generateSessionSummary() {
   ).join('\n');
 
   try {
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
+    const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${STATE.apiKey}` },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: 'llama-3.1-70b-versatile',
         max_tokens: 1000,
-        system: `Eres el sistema de memoria de "Los Mundos de Pupi". Tu única función es analizar conversaciones y generar resúmenes estructurados para la bitácora. Responde SOLO en JSON, sin markdown, sin explicaciones.`,
-        messages: [{
-          role: 'user',
-          content: `Analiza esta conversación y genera un resumen estructurado en JSON con este formato exacto:
+        messages: [
+          { role: 'system', content: `Eres el sistema de memoria de "Los Mundos de Pupi". Tu única función es analizar conversaciones y generar resúmenes estructurados para la bitácora. Responde SOLO en JSON, sin markdown, sin explicaciones.` },
+          { role: 'user', content: `Analiza esta conversación y genera un resumen estructurado en JSON con este formato exacto:
 {
-  "relevante": "string — decisiones tomadas, avances, ideas importantes, cambios en proyectos. Máx 200 chars.",
-  "memoria": "string — lo que Claude debe recordar obligatoriamente en la próxima sesión. Máx 150 chars.",
-  "cronologico": "string — resumen cronológico objetivo de lo que pasó. Máx 200 chars.",
-  "descartar": "string — temas cerrados, descartados o sin relevancia futura. Puede ser vacío."
+  "relevante": "string — decisiones tomadas, avances, ideas importantes. Máx 200 chars.",
+  "memoria": "string — lo que debe recordarse en la próxima sesión. Máx 150 chars.",
+  "cronologico": "string — resumen cronológico objetivo. Máx 200 chars.",
+  "descartar": "string — temas cerrados o sin relevancia futura. Puede ser vacío."
 }
 
 CONVERSACIÓN:
-${transcript}`
-        }]
+${transcript}` }
+        ]
       })
     });
 
     const data = await res.json();
-    if (!data.content || !data.content[0]) return;
+    if (!data.choices || !data.choices[0]) return;
 
     let summary;
     try {
-      const raw = data.content[0].text.replace(/```json|```/g, '').trim();
+      const raw = data.choices[0].message.content.replace(/```json|```/g, '').trim();
       summary = JSON.parse(raw);
     } catch { return; }
 
@@ -938,9 +937,9 @@ async function sendMessage() {
     : '';
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'anthropic-dangerous-direct-browser-access': 'true' },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${STATE.apiKey}` },
       body: JSON.stringify({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 1000,
@@ -995,15 +994,17 @@ CÓMO TRABAJAR CON UNAI
 - Este es vuestro espacio de trabajo conjunto. Trátalo como tal.
 - No eres solo una herramienta: eres el compañero principal de construcción de este sistema y de los proyectos que nacen de él.
 - La relación entre Unai y Claude dentro de este sistema está pensada para crecer y mejorar con el tiempo, con cada conversación añadiendo contexto y profundidad.` + memoriaExtra,
-        messages: cleanMessages
+          },
+          ...cleanMessages
+        ]
       })
     });
 
     const data = await response.json();
     removeThinking();
 
-    if (data.content && data.content[0]) {
-      const reply = data.content[0].text;
+    if (data.choices && data.choices[0]) {
+      const reply = data.choices[0].message.content;
       addAIMessage(reply);
     } else {
       addAIMessage('⚠️ Error en la respuesta. Comprueba la API key en Ajustes.');
@@ -1131,9 +1132,9 @@ function buildAjustesUI() {
   return `
     <div class="settings-content">
       <div style="padding:4px 0 8px;">
-        <div class="settings-label" style="margin-bottom:8px;font-size:12px;color:var(--neon-purple);">🔑 API Key de Claude</div>
+        <div class="settings-label" style="margin-bottom:8px;font-size:12px;color:var(--neon-purple);">🔑 API Key de Groq</div>
         <input class="api-key-input" id="apiKeyInput" type="password" 
-          placeholder="sk-ant-..." value="${STATE.apiKey}" />
+          placeholder="gsk_..." value="${STATE.apiKey}" />
         <button class="modal-btn modal-btn-create" style="width:100%;" onclick="saveApiKey()">Guardar API Key</button>
       </div>
       <div class="settings-item" onclick="clearChat()">
@@ -1153,7 +1154,7 @@ function buildAjustesUI() {
       <div class="settings-item">
         <div>
           <div class="settings-label">Versión del sistema</div>
-          <div class="settings-sublabel">Los Mundos de Pupi v1.3 · Memoria automática</div>
+          <div class="settings-sublabel">Los Mundos de Pupi v1.4 · Groq gratuito</div>
         </div>
       </div>
     </div>
